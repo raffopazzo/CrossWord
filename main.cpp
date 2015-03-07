@@ -6,34 +6,39 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 using namespace std;
 
-class TrieTreeNode {
-  char c;
-  unordered_map<char, shared_ptr<TrieTreeNode>> children;
+class DenseTrie {
+
+  struct Node {
+    char c;
+    shared_ptr<DenseTrie> child;
+
+    Node(char ch) : c(ch), child(make_shared<DenseTrie>()) {}
+  };
+
+  vector<Node> nodes;
 
 public:
-  TrieTreeNode(char c = 0) : c(c) { }
-  TrieTreeNode(const TrieTreeNode&) = delete;
+  DenseTrie()                 = default;
+  DenseTrie(const DenseTrie&) = delete;
 
-  bool empty() const { return children.empty(); }
+  bool empty() const { return nodes.empty(); }
 
   void add(const string &s, int i = 0) {
     if (i < s.length()) {
-      auto it = children.emplace(s[i], make_shared<TrieTreeNode>(s[i]));
-      shared_ptr<TrieTreeNode> child = it.first->second;
-      child->add(s, i+1);
+      auto child = insertOrGet(s[i]);
+      child->add(s, i + 1);
     }
   }
 
   bool containsWordStartingWith(const string &chars, int i) const {
     if (i < chars.size() && chars[i] != '\0') {
-      auto it = children.find(chars[i]);
-      if (it != children.end()) {
-        return it->second->containsWordStartingWith(chars, i+1);
+      auto child = findChild(chars[i]);
+      if (child != nullptr) {
+        return child->containsWordStartingWith(chars, i+1);
       } else {
         return false;
       }
@@ -41,11 +46,31 @@ public:
       return true;
     }
   }
+
+private:
+  DenseTrie* findChild(char c) const {
+    for (auto &n: nodes) {
+      if (n.c == c) {
+        return n.child.get();
+      }
+    }
+    return nullptr;
+  }
+
+  DenseTrie* insertOrGet(char c) {
+    auto n = findChild(c);
+    if (n != nullptr) {
+      return n;
+    } else {
+      nodes.emplace_back(c);
+      return nodes.back().child.get();
+    }
+  }
 };
 
 class Bucket {
   vector<string>        words;
-  mutable TrieTreeNode  trie;
+  mutable DenseTrie  trie;
 
 public:
 
