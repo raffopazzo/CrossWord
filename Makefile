@@ -21,5 +21,8 @@ clean:
 
 .PHONY: bench
 bench: CrossWord
-	echo $^ $(SIZE) > data
-	for i in $$(seq 1 $(MAX)); do ($(TIME) $^ $(SIZE)) 2>> data; done
+	@echo $^ $(SIZE) > data
+	@for i in $$(seq 1 $(MAX)); do               \
+		echo $$i of $(MAX);                       \
+		($(TIME) $^ $(SIZE) 1>/dev/null) 2>> data;\
+	done
