@@ -1,10 +1,14 @@
 MAX?=10
-SIZE?=3 4
+SIZE?=3x4
+THREADS?=1
 PATH+=:.
 TIME:=/usr/bin/time -f %e
 
+RUN=$^ --size=$(SIZE) --threads=$(THREADS)
+
 CXXFLAGS=
 CXXFLAGS+=-std=c++11
+CXXFLAGS+=-pthread
 CXXFLAGS+=-O3
 
 CrossWord: main.o
@@ -12,7 +16,12 @@ CrossWord: main.o
 
 .PHONY: test
 test: CrossWord
-	$(TIME) $^ $(SIZE)
+	$(TIME) $(RUN)
+
+.PHONY: profile
+profile: CXXFLAGS+=-pg
+profile: CrossWord
+	$(TIME) $(RUN)
 
 .PHONY: clean
 clean:
@@ -20,8 +29,9 @@ clean:
 
 .PHONY: bench
 bench: CrossWord
-	@echo $^ $(SIZE) > data
+	@cp data data-1
+	@echo $(RUN) > data
 	@for i in $$(seq 1 $(MAX)); do               \
 		echo $$i of $(MAX);                       \
-		($(TIME) $^ $(SIZE) 1>/dev/null) 2>> data;\
+		($(TIME) $(RUN) 1>/dev/null) 2>> data;\
 	done

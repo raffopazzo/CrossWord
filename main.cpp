@@ -1,10 +1,15 @@
 #include <algorithm>
+#include <atomic>
+#include <chrono>
+#include <cstdio>
 #include <exception>
 #include <fstream>
+#include <future>
 #include <iostream>
 #include <limits>
 #include <memory>
 #include <stdexcept>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -84,7 +89,6 @@ public:
   int size() const { return words.size(); }
 
   bool containsWordStartingWith(const string &chars) const {
-    if (trie.empty()) indexWords();
     return trie.containsWordStartingWith(chars, 0);
   }
 
@@ -147,6 +151,9 @@ public:
   }
 };
 
+static atomic_int   index;
+static atomic_bool  aborted {false};
+static int          threads = 2;
 class LargestCrosswordProblem {
   // Ideally buckets would be declared as vector<Bucket>. However, since the
   // number of required buckets isn't known in advance, the vector would require
@@ -164,27 +171,62 @@ public:
 
   const vector<Bucket>& getBuckets() { return *buckets; }
 
-  unique_ptr<CrossWord> findCrossword(int rows, int cols) {
+  shared_ptr<CrossWord> findCrossword(int rows, int cols) {
     const Bucket& horizontals = (*buckets)[cols];
     const Bucket& verticals   = (*buckets)[rows];
+    cout << rows << "x" << cols << " / "
+         << verticals.size() << "x" << horizontals.size() << endl;
+    horizontals.indexWords();
+    if (cols != rows) {
+      verticals.indexWords();
+    }
+    index = 0;
+    vector<future<shared_ptr<CrossWord>>> futures;
     if (horizontals.size() > verticals.size()) {
-      return tryBuildCrossword(rows, cols);
+      for (int i=0; i<threads; ++i) {
+        futures.push_back(async(launch::async,
+                                &LargestCrosswordProblem::tryBuildCrossword,
+                                this,
+                                rows,
+                                cols));
+      }
     } else {
-      return tryBuildCrossword(cols, rows);
+      for (int i=0; i<threads; ++i) {
+        futures.push_back(async(launch::async,
+                                &LargestCrosswordProblem::tryBuildCrossword,
+                                this,
+                                cols,
+                                rows));
+      }
+    }
+    while (true) {
+      for (auto &f: futures) {
+        f.wait();
+      }
+      for (auto &f: futures) {
+        auto res = f.get();
+        if (res != nullptr) {
+          return res;
+        }
+      }
+      return nullptr;
     }
   }
 
-  unique_ptr<CrossWord> tryBuildCrossword(int rows, int cols) {
+  shared_ptr<CrossWord> tryBuildCrossword(int rows, int cols) {
     const Bucket &horizontals = (*buckets)[cols];
     const Bucket &verticals   = (*buckets)[rows];
-    cout << rows << "x" << cols << " / "
-         << verticals.size() << "x" << horizontals.size() << endl;
     if (rows == cols && horizontals.size() < 2*rows) return nullptr;
-    unique_ptr<CrossWord> crossword{new CrossWord(rows, cols)};
+    shared_ptr<CrossWord> crossword{make_shared<CrossWord>(rows, cols)};
 
-    for (auto &s : verticals.getWords()) {
-      crossword->pushVertical(s);
+    for (int i; (i=index++) < verticals.size() && !aborted; ) {
+      ostringstream str;
+      str << i << " of " << verticals.size() << ' ' << this_thread::get_id() << endl;
+      cout << str.str();
+      crossword->pushVertical(verticals.getWords()[i]);
       if (tryFill(crossword.get())) {
+        // set flag to abort all other async calls
+        aborted = true;
         return crossword;
       }
       crossword->popVertical();
@@ -209,11 +251,12 @@ private:
   }
 
   bool tryFill(CrossWord *crossword) {
-    const Bucket &horizontals = (*buckets)[crossword->cols()];
+    const Bucket& horizontals = (*buckets)[crossword->cols()];
     const Bucket &verticals   = (*buckets)[crossword->rows()];
     if (! crossword->isPartialOk(getBuckets())) return false;
     if (crossword->isFull()) return true;
     for (auto &s: verticals.getWords()) {
+      if (aborted) return false;
       crossword->pushVertical(s);
       if (tryFill(crossword)) {
         return true;
@@ -235,22 +278,47 @@ ostream& operator<<(ostream& os, const CrossWord& crossword) {
   return os;
 }
 
-int main(int argc, char* argv[]) {
-  LargestCrosswordProblem p("parole.txt");
-  int i=0;
-  for (auto &b: p.getBuckets()) {
-    cout << i++ << " " << b.size() << endl;
+struct Config {
+  int threads {1};
+  int rows    {0};
+  int cols    {0};
+  bool print_buckets{false};
+
+  Config(int argc, char* argv[]) {
+    int t1, t2;
+    for (int i=1; i<argc; ++i) {
+      if (1 == sscanf(argv[i], "--threads=%d", &t1)) {
+        threads = t1;
+      } else if (2 == sscanf(argv[i], "--size=%dx%d", &t1, &t2)) {
+        rows = t1;
+        cols = t2;
+      } else if (1 == sscanf(argv[i], "--print-buckets=%d", &t1)) {
+        print_buckets = t1 != 0;
+      } else {
+        cout << "Unrecognised parameter " << argv[i] << endl;
+      }
+    }
   }
-  if (argc == 1) {
+};
+
+int main(int argc, char* argv[]) {
+  Config config {argc, argv};
+  threads = config.threads;
+
+  LargestCrosswordProblem p("parole.txt");
+  if (config.print_buckets) {
+    int i = 0;
+    for (auto &b: p.getBuckets()) {
+      cout << i++ << " " << b.size() << endl;
+    }
+  }
+  if (config.rows == 0 && config.cols == 0) {
 //  cout << p.findLargestCrossword() << endl;
-  } else if (argc == 3) {
-    auto crossword = p.findCrossword(stoi(argv[1]), stoi(argv[2]));
+  } else {
+    auto crossword = p.findCrossword(config.rows, config.cols);
     if (crossword != nullptr) {
       cout << *crossword << endl;
     }
-  } else {
-    cerr << "Invalid arguments" << endl;
-    return -1;
   }
   return 0;
 }
