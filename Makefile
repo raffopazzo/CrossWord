@@ -5,7 +5,6 @@ TIME:=/usr/bin/time -f %e
 
 CXXFLAGS=
 CXXFLAGS+=-std=c++11
-CXXFLAGS+=-pg
 CXXFLAGS+=-O3
 
 CrossWord: main.o
