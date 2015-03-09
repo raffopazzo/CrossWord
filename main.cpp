@@ -40,11 +40,11 @@ public:
     }
   }
 
-  bool containsWordStartingWith(const string &chars, int i) const {
-    if (i < chars.size() && chars[i] != '\0') {
+  bool containsWordStartingWith(const string &chars, int i, int maxLen) const {
+    if (i < maxLen) {
       auto child = findChild(chars[i]);
       if (child != nullptr) {
-        return child->containsWordStartingWith(chars, i+1);
+        return child->containsWordStartingWith(chars, i+1, maxLen);
       } else {
         return false;
       }
@@ -75,7 +75,7 @@ private:
 };
 
 class Bucket {
-  vector<string>        words;
+  vector<string>     words;
   mutable DenseTrie  trie;
 
 public:
@@ -89,8 +89,8 @@ public:
 
   int size() const { return words.size(); }
 
-  bool containsWordStartingWith(const string &chars) const {
-    return trie.containsWordStartingWith(chars, 0);
+  bool containsWordStartingWith(const string &chars, int maxLen) const {
+    return trie.containsWordStartingWith(chars, 0, maxLen);
   }
 
   void indexWords() const {
@@ -132,9 +132,6 @@ public:
   void popVertical() {
     if (lastCol == 0) throw std::runtime_error{"No cols to pop"};
     --lastCol;
-    for (auto &r : v_rows) {
-      r[lastCol] = 0;
-    }
   }
 
   bool isFull() {
@@ -144,7 +141,7 @@ public:
   bool isPartialOk(const vector<Bucket> &buckets) { 
     auto &horizontals = buckets[n_cols];
     for (auto &r: v_rows) {
-      if (! horizontals.containsWordStartingWith(r)) {
+      if (! horizontals.containsWordStartingWith(r, lastCol)) {
         return false;
       }
     }
