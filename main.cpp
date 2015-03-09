@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <cstdio>
 #include <exception>
 #include <fstream>
@@ -171,6 +172,22 @@ public:
 
   const vector<Bucket>& getBuckets() { return *buckets; }
 
+  shared_ptr<CrossWord> findLargestCrossword() {
+    auto maxSize = getBuckets().size() - 1;
+    for (int area = maxSize * maxSize; area >= 1; --area) {
+      for (int rows = maxSize; rows >= sqrt(area); --rows ) {
+        if (area % rows == 0) {
+          int cols = area / rows;
+          if (cols <= maxSize) {
+            shared_ptr<CrossWord> crossword = findCrossword(rows, cols);
+            if (crossword != nullptr) return crossword;
+          }
+        }
+      }
+    }
+    return nullptr;
+  }
+
   shared_ptr<CrossWord> findCrossword(int rows, int cols) {
     const Bucket& horizontals = (*buckets)[cols];
     const Bucket& verticals   = (*buckets)[rows];
@@ -182,34 +199,31 @@ public:
     }
     index = 0;
     vector<future<shared_ptr<CrossWord>>> futures;
-    if (horizontals.size() > verticals.size()) {
-      for (int i=0; i<threads; ++i) {
+    if (horizontals.size() <= verticals.size()) {
+      swap(rows, cols);
+    }
+    if (threads == 1) {
+      return tryBuildCrossword(rows,cols);
+    } else {
+      for (int i = 0; i < threads; ++i) {
         futures.push_back(async(launch::async,
                                 &LargestCrosswordProblem::tryBuildCrossword,
                                 this,
                                 rows,
                                 cols));
       }
-    } else {
-      for (int i=0; i<threads; ++i) {
-        futures.push_back(async(launch::async,
-                                &LargestCrosswordProblem::tryBuildCrossword,
-                                this,
-                                cols,
-                                rows));
-      }
-    }
-    while (true) {
-      for (auto &f: futures) {
-        f.wait();
-      }
-      for (auto &f: futures) {
-        auto res = f.get();
-        if (res != nullptr) {
-          return res;
+      while (true) {
+        for (auto &f: futures) {
+          f.wait();
         }
+        for (auto &f: futures) {
+          auto res = f.get();
+          if (res != nullptr) {
+            return res;
+          }
+        }
+        return nullptr;
       }
-      return nullptr;
     }
   }
 
@@ -219,9 +233,9 @@ public:
     if (rows == cols && horizontals.size() < 2*rows) return nullptr;
     shared_ptr<CrossWord> crossword{make_shared<CrossWord>(rows, cols)};
 
-    for (int i; (i=index++) < verticals.size() && !aborted; ) {
+    for (int i=index++; i < verticals.size() && !aborted; ++index) {
       ostringstream str;
-      str << i << " of " << verticals.size() << ' ' << this_thread::get_id() << endl;
+      str << rows << 'x' << cols << ": " << i << " of " << verticals.size() << ' ' << this_thread::get_id() << endl;
       cout << str.str();
       crossword->pushVertical(verticals.getWords()[i]);
       if (tryFill(crossword.get())) {
@@ -313,7 +327,7 @@ int main(int argc, char* argv[]) {
     }
   }
   if (config.rows == 0 && config.cols == 0) {
-//  cout << p.findLargestCrossword() << endl;
+    cout << p.findLargestCrossword() << endl;
   } else {
     auto crossword = p.findCrossword(config.rows, config.cols);
     if (crossword != nullptr) {
