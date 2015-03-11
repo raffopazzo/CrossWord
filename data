@@ -1,11 +1,11 @@
-CrossWord --size=15x15 --threads=2
-1.73
-1.65
-1.66
-1.66
-1.66
-1.66
-1.65
-1.67
-Command terminated by signal 2
-0.79
+CrossWord --size=13x13 --threads=1
+12.94
+12.96
+12.96
+13.15
+13.12
+12.98
+12.93
+12.93
+13.00
+12.99

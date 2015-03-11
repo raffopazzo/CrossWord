@@ -170,6 +170,8 @@ class LargestCrosswordProblem {
   // number of buckets has been discovered.
   unique_ptr<vector<Bucket>> buckets;
 
+  Bucket *horizontals;
+  Bucket *verticals;
 public:
   LargestCrosswordProblem(const string &filename) {
     organiseInBuckets(filename);
@@ -196,16 +198,16 @@ public:
   }
 
   shared_ptr<CrossWord> findCrossword(int rows, int cols) {
-    Bucket& horizontals = (*buckets)[cols];
-    Bucket& verticals   = (*buckets)[rows];
+    horizontals = &(*buckets)[cols];
+    verticals   = &(*buckets)[rows];
     cout << rows << "x" << cols << " / "
-         << verticals.size() << "x" << horizontals.size() << endl;
-    horizontals.indexWords();
+         << verticals->size() << "x" << horizontals->size() << endl;
+    horizontals->indexWords();
     if (cols != rows) {
-      verticals.indexWords();
+      verticals->indexWords();
     }
     index = 0;
-    if (horizontals.size() <= verticals.size()) {
+    if (horizontals->size() <= verticals->size()) {
       swap(rows, cols);
     }
     if (threads == 1) {
@@ -228,17 +230,15 @@ public:
   }
 
   shared_ptr<CrossWord> tryBuildCrossword(int rows, int cols) {
-    const Bucket &horizontals = (*buckets)[cols];
-    const Bucket &verticals   = (*buckets)[rows];
-    if (rows == cols && horizontals.size() < 2*rows) return nullptr;
+    if (rows == cols && horizontals->size() < 2*rows) return nullptr;
     shared_ptr<CrossWord> crossword{make_shared<CrossWord>(rows, cols)};
 
-    auto &words = verticals.getWords();
+    auto &words = verticals->getWords();
     for (int i=index.fetch_add(1, memory_order_relaxed);
-           i < verticals.size() && !aborted;
+           i < verticals->size() && !aborted;
            i=index.fetch_add(1, memory_order_relaxed)) {
       ostringstream str;
-      str << rows << 'x' << cols << ": " << i << " of " << verticals.size() << ' ' << this_thread::get_id() << endl;
+      str << rows << 'x' << cols << ": " << i << " of " << verticals->size() << ' ' << this_thread::get_id() << endl;
       cout << str.str();
       crossword->pushVertical(words[i]);
       pair<int,char> missing_char;
@@ -269,11 +269,9 @@ private:
   }
 
   bool tryFill(CrossWord *crossword, pair<int,char> &missing_char) {
-    const Bucket& horizontals = (*buckets)[crossword->cols()];
-    const Bucket &verticals   = (*buckets)[crossword->rows()];
     if (! crossword->isPartialOk(getBuckets(), missing_char)) return false;
     if (crossword->isFull()) return true;
-    for (auto &s: verticals.getWords()) {
+    for (auto &s: verticals->getWords()) {
       if (aborted) return false;
       // Check whether it's worth trying the next vertical word comparing it to
       // the last vertical word we tried. If the last vertical word has been
