@@ -183,9 +183,9 @@ public:
 
   const vector<Bucket>& getBuckets() { return *buckets; }
 
-  shared_ptr<CrossWord> findLargestCrossword() {
+  shared_ptr<CrossWord> findLargestCrossword(int maxArea) {
     auto maxSize = getBuckets().size() - 1;
-    for (int area = maxSize * maxSize; area >= 1; --area) {
+    for (int area = maxArea ? maxArea : maxSize * maxSize; area >= 1; --area) {
       for (int rows = maxSize; rows >= sqrt(area); --rows ) {
         if (area % rows == 0) {
           int cols = area / rows;
@@ -309,6 +309,7 @@ struct Config {
   int threads {1};
   int rows    {0};
   int cols    {0};
+  int maxArea {0};
   bool print_buckets{false};
 
   Config(int argc, char* argv[]) {
@@ -321,6 +322,8 @@ struct Config {
         cols = t2;
       } else if (1 == sscanf(argv[i], "--print-buckets=%d", &t1)) {
         print_buckets = t1 != 0;
+      } else if (1 == sscanf(argv[i], "--max-area=%d", &t1)) {
+        maxArea = t1;
       } else {
         cout << "Unrecognised parameter " << argv[i] << endl;
       }
@@ -340,7 +343,7 @@ int main(int argc, char* argv[]) {
     }
   }
   if (config.rows == 0 && config.cols == 0) {
-    cout << p.findLargestCrossword() << endl;
+    cout << p.findLargestCrossword(config.maxArea) << endl;
   } else {
     auto crossword = p.findCrossword(config.rows, config.cols);
     if (crossword != nullptr) {
