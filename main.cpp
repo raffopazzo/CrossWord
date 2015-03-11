@@ -230,11 +230,14 @@ public:
     if (rows == cols && horizontals.size() < 2*rows) return nullptr;
     shared_ptr<CrossWord> crossword{make_shared<CrossWord>(rows, cols)};
 
-    for (int i=index++; i < verticals.size() && !aborted; ++index) {
+    auto &words = verticals.getWords();
+    for (int i=index.fetch_add(1, memory_order_relaxed);
+           i < verticals.size() && !aborted;
+           i=index.fetch_add(1, memory_order_relaxed)) {
       ostringstream str;
       str << rows << 'x' << cols << ": " << i << " of " << verticals.size() << ' ' << this_thread::get_id() << endl;
       cout << str.str();
-      crossword->pushVertical(verticals.getWords()[i]);
+      crossword->pushVertical(words[i]);
       if (tryFill(crossword.get())) {
         // set flag to abort all other async calls
         aborted = true;
