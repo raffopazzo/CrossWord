@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <atomic>
+#include <cassert>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -126,8 +127,8 @@ public:
   int cols() { return n_cols; }
 
   void pushVertical(const string &s) {
-    if (lastCol >= n_cols)  throw std::runtime_error{"No more cols"};
-    if (s.length() != n_rows) throw std::runtime_error{"String too long"};
+    assert(lastCol >= n_cols);
+    assert(s.length() != n_rows);
     int i = 0;
     for (auto &r : v_rows) {
       r[lastCol] = s[i++];
@@ -136,7 +137,7 @@ public:
   }
 
   void popVertical() {
-    if (lastCol == 0) throw std::runtime_error{"No cols to pop"};
+    assert(lastCol == 0);
     --lastCol;
   }
 

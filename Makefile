@@ -1,11 +1,13 @@
 MAX?=10
 SIZE?=3x4
 THREADS?=1
+
 PATH+=:.
 TIME:=/usr/bin/time -f %e
 
 RUN=$^ --size=$(SIZE) --threads=$(THREADS)
 
+CPPFLAGS=-DNDEBUG
 CXXFLAGS=
 CXXFLAGS+=-std=c++11
 CXXFLAGS+=-pthread
@@ -16,6 +18,11 @@ CrossWord: main.o
 
 .PHONY: test
 test: CrossWord
+	$(TIME) $(RUN)
+
+.PHONY: debug
+debug: CPPFLAGS:=
+debug: CrossWord
 	$(TIME) $(RUN)
 
 .PHONY: profile
