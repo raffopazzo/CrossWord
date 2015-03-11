@@ -79,8 +79,8 @@ private:
 };
 
 class Bucket {
-  vector<string>     words;
-  mutable DenseTrie  trie;
+  vector<string>  words;
+  DenseTrie       trie;
 
 public:
 
@@ -99,7 +99,7 @@ public:
     return trie.containsWordStartingWith(chars, 0, maxLen, missing_ch);
   }
 
-  void indexWords() const {
+  void indexWords() {
     for (auto &s: words) trie.add(s);
   }
 };
@@ -196,8 +196,8 @@ public:
   }
 
   shared_ptr<CrossWord> findCrossword(int rows, int cols) {
-    const Bucket& horizontals = (*buckets)[cols];
-    const Bucket& verticals   = (*buckets)[rows];
+    Bucket& horizontals = (*buckets)[cols];
+    Bucket& verticals   = (*buckets)[rows];
     cout << rows << "x" << cols << " / "
          << verticals.size() << "x" << horizontals.size() << endl;
     horizontals.indexWords();
