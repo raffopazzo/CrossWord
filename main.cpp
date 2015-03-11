@@ -112,13 +112,15 @@ class CrossWord {
   int lastCol;
 
   vector<string> v_rows;
+  const Bucket *horizontals;
 
 public:
-  CrossWord(int rows, int cols) :
+  CrossWord(int rows, int cols, const vector<Bucket> &buckets) :
       n_rows(rows),
       n_cols(cols),
       lastCol(0),
-      v_rows(rows, string(cols, '\0'))
+      v_rows(rows, string(cols, '\0')),
+      horizontals(&buckets[n_cols])
   { }
 
   CrossWord(const CrossWord&) = delete;
@@ -145,12 +147,11 @@ public:
     return lastCol == n_cols;
   }
 
-  bool isPartialOk(const vector<Bucket> &buckets, pair<int,char> &missing_char) {
-    auto &horizontals = buckets[n_cols];
+  bool isPartialOk(pair<int,char> &missing_char) {
     int i=0;
     for (auto &r: v_rows) {
       char missing_ch;
-      if (! horizontals.containsWordStartingWith(r, lastCol, &missing_ch)) {
+      if (! horizontals->containsWordStartingWith(r, lastCol, &missing_ch)) {
         missing_char = make_pair(i, missing_ch);
         return false;
       }
@@ -232,7 +233,7 @@ public:
 
   shared_ptr<CrossWord> tryBuildCrossword(int rows, int cols) {
     if (rows == cols && horizontals->size() < 2*rows) return nullptr;
-    shared_ptr<CrossWord> crossword{make_shared<CrossWord>(rows, cols)};
+    auto crossword = make_shared<CrossWord>(rows, cols, getBuckets());
 
     auto &words = verticals->getWords();
     for (int i=index.fetch_add(1, memory_order_relaxed);
@@ -270,7 +271,7 @@ private:
   }
 
   bool tryFill(CrossWord *crossword, pair<int,char> &missing_char) {
-    if (! crossword->isPartialOk(getBuckets(), missing_char)) return false;
+    if (! crossword->isPartialOk(missing_char)) return false;
     if (crossword->isFull()) return true;
     for (auto &s: verticals->getWords()) {
       if (aborted) return false;
