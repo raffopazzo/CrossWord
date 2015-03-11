@@ -205,13 +205,13 @@ public:
       verticals.indexWords();
     }
     index = 0;
-    vector<future<shared_ptr<CrossWord>>> futures;
     if (horizontals.size() <= verticals.size()) {
       swap(rows, cols);
     }
     if (threads == 1) {
       return tryBuildCrossword(rows,cols);
     } else {
+      vector<future<shared_ptr<CrossWord>>> futures;
       for (int i = 0; i < threads; ++i) {
         futures.push_back(async(launch::async,
                                 &LargestCrosswordProblem::tryBuildCrossword,
@@ -219,18 +219,11 @@ public:
                                 rows,
                                 cols));
       }
-      while (true) {
-        for (auto &f: futures) {
-          f.wait();
-        }
-        for (auto &f: futures) {
-          auto res = f.get();
-          if (res != nullptr) {
-            return res;
-          }
-        }
-        return nullptr;
+      for (auto &f: futures) {
+        auto res = f.get();
+        if (res != nullptr) return res;
       }
+      return nullptr;
     }
   }
 
