@@ -40,12 +40,16 @@ public:
     }
   }
 
-  bool containsWordStartingWith(const string &chars, int i, int maxLen) const {
+  bool containsWordStartingWith(const string &chars,
+                                int           i,
+                                int           maxLen,
+                                char         *missing_ch) const {
     if (i < maxLen) {
       auto child = findChild(chars[i]);
       if (child != nullptr) {
-        return child->containsWordStartingWith(chars, i+1, maxLen);
+        return child->containsWordStartingWith(chars, i+1, maxLen, missing_ch);
       } else {
+        *missing_ch = chars[i];
         return false;
       }
     } else {
@@ -89,8 +93,10 @@ public:
 
   int size() const { return words.size(); }
 
-  bool containsWordStartingWith(const string &chars, int maxLen) const {
-    return trie.containsWordStartingWith(chars, 0, maxLen);
+  bool containsWordStartingWith(const string &chars,
+                                int           maxLen,
+                                char         *missing_ch) const {
+    return trie.containsWordStartingWith(chars, 0, maxLen, missing_ch);
   }
 
   void indexWords() const {
@@ -138,12 +144,16 @@ public:
     return lastCol == n_cols;
   }
 
-  bool isPartialOk(const vector<Bucket> &buckets) { 
+  bool isPartialOk(const vector<Bucket> &buckets, pair<int,char> &missing_char) {
     auto &horizontals = buckets[n_cols];
+    int i=0;
     for (auto &r: v_rows) {
-      if (! horizontals.containsWordStartingWith(r, lastCol)) {
+      char missing_ch;
+      if (! horizontals.containsWordStartingWith(r, lastCol, &missing_ch)) {
+        missing_char = make_pair(i, missing_ch);
         return false;
       }
+      ++i;
     }
     return true;
   }
@@ -238,7 +248,8 @@ public:
       str << rows << 'x' << cols << ": " << i << " of " << verticals.size() << ' ' << this_thread::get_id() << endl;
       cout << str.str();
       crossword->pushVertical(words[i]);
-      if (tryFill(crossword.get())) {
+      pair<int,char> missing_char;
+      if (tryFill(crossword.get(), missing_char)) {
         // set flag to abort all other async calls
         aborted = true;
         return crossword;
@@ -264,18 +275,34 @@ private:
     }
   }
 
-  bool tryFill(CrossWord *crossword) {
+  bool tryFill(CrossWord *crossword, pair<int,char> &missing_char) {
+//  cout << *crossword << endl;
     const Bucket& horizontals = (*buckets)[crossword->cols()];
     const Bucket &verticals   = (*buckets)[crossword->rows()];
-    if (! crossword->isPartialOk(getBuckets())) return false;
+    if (! crossword->isPartialOk(getBuckets(), missing_char)) return false;
     if (crossword->isFull()) return true;
     for (auto &s: verticals.getWords()) {
       if (aborted) return false;
-      crossword->pushVertical(s);
-      if (tryFill(crossword)) {
-        return true;
+      if (s[get<0>(missing_char)] != get<1>(missing_char)) {
+//      cout << "Trying '" << s
+//           << "' because it doesn't contain "
+//           << get<1>(missing_char) << " at " << get<0>(missing_char)
+//           << endl;
+        crossword->pushVertical(s);
+        if (tryFill(crossword, missing_char)) {
+          return true;
+//      } else {
+//          cout << "Next time I shouldn't try words containing "
+//               << get<1>(missing_char) << " at " << get<0>(missing_char)
+//               << endl;
+        }
+        crossword->popVertical();
+//    } else {
+//        cout << "Not trying '" << s
+//             << "' because it's not possible to have words containg "
+//             << get<1>(missing_char) << " at " << get<0>(missing_char)
+//             << endl;
       }
-      crossword->popVertical();
     }
     return false;
   }
