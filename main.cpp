@@ -269,32 +269,25 @@ private:
   }
 
   bool tryFill(CrossWord *crossword, pair<int,char> &missing_char) {
-//  cout << *crossword << endl;
     const Bucket& horizontals = (*buckets)[crossword->cols()];
     const Bucket &verticals   = (*buckets)[crossword->rows()];
     if (! crossword->isPartialOk(getBuckets(), missing_char)) return false;
     if (crossword->isFull()) return true;
     for (auto &s: verticals.getWords()) {
       if (aborted) return false;
+      // Check whether it's worth trying the next vertical word comparing it to
+      // the last vertical word we tried. If the last vertical word has been
+      // discarded, it's because one of its characters led to a horizontal word
+      // which doesn't exist in the horizontals bucket and isPartialOk() failed.
+      // So, we check whether the next vertical word contains that same character
+      // in the very same position. If so, we skip it as it would lead again to
+      // a horizontal word which cannot exist in the horizontals bucket.
       if (s[get<0>(missing_char)] != get<1>(missing_char)) {
-//      cout << "Trying '" << s
-//           << "' because it doesn't contain "
-//           << get<1>(missing_char) << " at " << get<0>(missing_char)
-//           << endl;
         crossword->pushVertical(s);
         if (tryFill(crossword, missing_char)) {
           return true;
-//      } else {
-//          cout << "Next time I shouldn't try words containing "
-//               << get<1>(missing_char) << " at " << get<0>(missing_char)
-//               << endl;
         }
         crossword->popVertical();
-//    } else {
-//        cout << "Not trying '" << s
-//             << "' because it's not possible to have words containg "
-//             << get<1>(missing_char) << " at " << get<0>(missing_char)
-//             << endl;
       }
     }
     return false;
